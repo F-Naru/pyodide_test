@@ -1,0 +1,102 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <!-- Pyodide -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.1/full/pyodide.js"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Ace Editor -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.24.0/ace.js"></script>
+    <style>
+      #editor {
+        width: 100%;
+        height: 500px;
+      }
+      #output {
+        width: 100%;
+        height: 500px;
+      }
+    </style>
+  </head>
+  <body class="container py-5">
+    <div class="row">
+      <!-- Ace Editor -->
+      <div class="col-md-6">
+        <div id="editor">print("Hello, World!")
+</div>
+        <button class="btn btn-success" onclick="evaluatePython()">
+          <i class="bi bi-play-circle-fill"></i> 実行</button>
+        <button class="btn btn-warning" onclick="resetOutput()">
+          <i class="bi bi-arrow-counterclockwise"></i> 出力を消去</button>
+        <a class="btn btn-primary" onclick="downloadProgram()">
+          <i class="bi bi-download"></i> プログラム ダウンロード</a>
+      </div>
+      <div class="col-md-6">
+        <textarea id="output" class="form-control" rows="6" disabled></textarea>
+      </div>        
+    </div>
+    <script>
+      const output = document.getElementById("output");
+      // Ace Editor
+      const editor = ace.edit("editor");
+      editor.setTheme("ace/theme/chrome");
+      editor.setFontSize(16);
+      editor.session.setMode("ace/mode/python");
+
+      output.value = "初期化中...\n";
+      async function main() {
+        let pyodide = await loadPyodide();
+        // import module
+        await pyodide.loadPackage(["numpy", "matplotlib", "scipy", "opencv-python", "pillow", "beautifulsoup4", "requests"]);
+        output.value = "";
+        pyodide.runPython(`
+import sys
+from js import output
+
+class StdoutCatcher:
+    def write(self, s):
+        output.value += s
+
+class StderrCatcher:
+    def write(self, s):
+        output.value += "Error: " + s
+
+sys.stdout = StdoutCatcher()
+sys.stderr = StderrCatcher()
+        `);
+        return pyodide;
+      }
+      let pyodideReadyPromise = main();
+      
+      async function evaluatePython() {
+        let pyodide = await pyodideReadyPromise;
+        try {
+          const pythonCode = editor.getValue();
+          pyodide.runPython(pythonCode);
+        } catch (err) {
+          output.value += "Error: " + err;
+        }
+      }
+
+      function resetOutput() {
+        output.value = "";
+      }
+
+      function downloadProgram() {
+        const programCode = editor.getValue();
+        const blob = new Blob([programCode], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "program.py";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    </script>
+  </body>
+</html>
